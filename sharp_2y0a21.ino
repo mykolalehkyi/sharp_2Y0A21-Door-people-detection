@@ -1,3 +1,9 @@
+/*         CONNECTION
+|Sharp 2Y0A21 Arduino Mega 2560|
+|     V0          A0           |
+|     GND         GND          |
+|     Vcc         5V           |
+*/
 //10-80 cm work range
 const int IRpin = A0;          // аналоговый пин для подключения выхода Vo сенсора
 const int iTimes=5; //змінна для сер.знач.
