@@ -8,7 +8,7 @@
 const int IRpin = A0;          // аналоговый пин для подключения выхода Vo сенсора
 const int iTimes=5; //змінна для сер.знач.
 //int value1;                    // для хранения аналогового значения
-unsigned long long ullPeopleCou=0; 
+int PeopleCou=0; 
 void setup() {
   Serial.begin(9600);            // Запуск последовательного порта
   }
@@ -43,7 +43,9 @@ void CheckDistance(float distance){
   Serial.println(distance);      // выдаем в порт значение
   if(distance<40 || distance>115){
     Serial.println("Object detected");
-    ullPeopleCou++;
+    PeopleCou++;
+     Serial.print("Counted: ");
+     Serial.println(PeopleCou);
     delay(1500);
   }
 }
