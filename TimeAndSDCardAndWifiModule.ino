@@ -3,8 +3,13 @@
 #include <TimeLib.h>
 #include <DS1307RTC.h>
 
-#define TIME_HEADER  "T"   // Header tag for serial time sync message
+#define TIME_HEADER  'T'   // Header tag for serial time sync message
 #define TIME_REQUEST  7    // ASCII bell character requests a time sync message 
+#define userID 3;
+#define ID 1;
+#define IP_SERVER "192.168.0.182";
+#define SISS "inneti-wifi";
+#define PASSWORD "2367111b";
 
 #include <SPI.h>
 #include <SD.h>
@@ -106,6 +111,9 @@ Sharp2Y0A21 sharpRight(A1, "sharpRight");
 
 void setup() {
   Serial.begin(9600);
+  Serial1.begin(115200);
+  pinMode(13, OUTPUT);
+  digitalWrite(13, LOW);
   while (!Serial) {
     ; // wait for serial port to connect. Needed for native USB port only
   }
@@ -115,7 +123,7 @@ void setup() {
   //SD.remove("test.txt");
   myFile = SD.open(fileName, FILE_WRITE);
   //writeFile("Everything work");
-  readFile();
+  //readFile();
   sharpLeft.stabilaze();
   sharpRight.stabilaze();
    ClockModuleCheck();
@@ -134,6 +142,12 @@ void  loop() {
 
   checkInOut();
   Serial.println(sharpLeft.checkPass());
+  if (RTC.read(tm)) {
+      if(tm.Second<5){
+      
+      sendData();
+    }
+    }
 }
 
 void digitalClockDisplay() {
@@ -330,3 +344,116 @@ void ClockModuleCheck(){
     delay(9000);
   }
 }
+bool sendData()
+{
+  bool send=false;
+  int reset=0;
+  while(!send){
+
+  if(reset>=3)
+  {
+  Serial.println("RESET");
+  Serial1.println("AT+RST");
+  
+  delay(10000);
+  reset=0;
+  }
+
+    
+  connectWiFi();
+
+Serial1.println("AT+CIPMUX=0\r\n");      // To Set MUX = 0
+  delay(2000);                             // Wait for 2 sec
+
+  // TCP connection 
+  String cmd = "AT+CIPSTART=\"TCP\",\"";   // TCP connection with https://thingspeak.com server
+  cmd += IP_SERVER;                // IP addr of api.thingspeak.com
+  cmd += "\",80\r\n\r\n";                  // Port No. = 80
+
+  Serial1.println(cmd);                    // Display above Command on PC
+  Serial.println(cmd);                     // Send above command to Rx1, Tx1
+                            // Wait for 20 Sec
+
+  if(Serial1.find("ERROR"))                // If returns error in TCP connection
+  { 
+    Serial.println("AT+CIPSTART error");   // Display error msg to PC
+    //return; 
+  }
+
+  // prepare GET string "GET /SensorCP/setdata.php?id=1&value=10&cdata=2019-01-06&userID=1\r\n\r\n"
+  String getStr="GET /SensorCP/setdata.php?id=";
+  getStr+=ID;
+  getStr+="&value=";
+  getStr+=people.in;
+  getStr+="&cdata=";
+  getStr+=tmYearToCalendar(tm.Year);
+  getStr+="-";
+  getStr+=print2digitsV2(tm.Month);
+  getStr+="-";
+  getStr+=print2digitsV2(tm.Day);
+  getStr+="&userID=";
+  getStr+=userID;
+  getStr+="\r\nHHTP/1.1";
+  Serial.println(getStr);                 // Display GET String on PC
+
+  cmd = "AT+CIPSEND=";                    // send data length 
+  cmd += String(getStr.length());
+  cmd+="\r\n";
+
+
+  delay(1000);
+  Serial1.println(cmd);
+  delay(2000);
+  Serial.println("send"); 
+  delay(2000);// Send Data length command to Tx1, Rx1
+ 
+  if(Serial1.find(">"))// If prompt opens //verify connection with cloud
+  {
+    Serial.println("connected to Cloud");// Display confirmation msg to PC
+    Serial1.println(getStr);
+    send=true;
+    people.in=0;
+    // Send GET String to Rx1, Tx1
+  }
+  else
+  { 
+    Serial1.println("AT+CIPCLOSE\r\n");    // Send Close Connection command to Rx1, Tx1
+    Serial.println("AT+CIPCLOSE");         // Display Connection closed command on PC
+    reset++;
+  } 
+
+  // thingspeak free version needs 16 sec delay between updates 
+  delay(2000);                            // wait for 16sec
+  }
+  
+  
+}
+
+boolean connectWiFi() {               // Connect to Wifi Function
+  Serial1.println("AT+CWMODE=1\r\n"); // Setting Mode = 1 
+  delay(100);                         // wait for 100 mSec
+
+  String cmd = "AT+CWJAP=\"";         // Connect to WiFi
+  cmd += SISS;                   // ssid_name
+  cmd += "\",\"";
+  cmd += PASSWORD;                // password
+  cmd += "\"\r\n";              
+  
+  Serial.println(cmd);                // Display Connect Wifi Command on PC
+  Serial1.println(cmd);               // send Connect WiFi command to Rx1, Tx1 
+  
+  delay(10000);                       // wait for 10 sec
+
+  Serial1.println("AT+CWJAP?");       // Verify Connected WiFi
+
+  if(Serial1.find("+CWJAP"))        
+  {
+    Serial.println("OK, Connected to WiFi.");         // Display Confirmation msg on PC
+    return true;
+  }
+  else
+  {
+    Serial.println("Can not connect to the WiFi.");   // Display Error msg on PC
+    return false;
+  }
+ }
